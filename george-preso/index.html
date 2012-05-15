@@ -136,7 +136,8 @@ trait PostService extends BlueEyesServiceBuilder
 startup {
   log.debug("starting")
   val mongoURI = new MongoURI("mongodb://127.0.0.1:27017/phase")
-  PostConfig(new EnvMongo(mongoURI, context.config.configMap("mongo"))).future
+  PostConfig(new EnvMongo(mongoURI, 
+             context.config.configMap("mongo"))).future
 } ->
 </pre>
         </section>
