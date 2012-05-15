@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+
+<!--
+  Google HTML5 slide template
+
+  Authors: Luke Mahé (code)
+           Marcin Wichary (code and design)
+           
+           Dominic Mazzoni (browser compatibility)
+           Charles Chen (ChromeVox support)
+
+  URL: http://code.google.com/p/html5slides/
+-->
+
+<html>
+  <head>
+	<title>Comparing BlueEyes and Play! 2.0</title>
+
+	<meta charset="utf-8">
+	
+	<script src="http://html5slides.googlecode.com/svn/trunk/slides.js"></script>
+	<script src="http://html5slides.googlecode.com/svn/trunk/prettify.js"></script>
+  </head>
+  
+  <style>
+	.slides.template-default > article:not(.nobackground):not(.biglogo) {
+	  background-image: none !important;
+	}
+	p.center {
+	  position: relative;
+	  top: 40%;
+	  text-align: center;
+	}
+	small.tiny {
+	  font-size: 16px;
+	}
+  </style>
+
+  <body style="display: none">
+
+	<section class="slides layout-regular template-default">
+
+	  <article>
+		<h1>BlueEyes and Play! 2.0</h1>
+		<p>
+		  George Adams
+		  <br/>
+		  May 15, 2012
+		</p>
+	  </article>
+      
+	  <article>
+		<h2>Intro</h2>
+	  </article>
+
+	  <article>
+		<p class="center">"Web 3.0"</p>
+	  </article>
+
+      <article>
+        <p class="center"><del>Containers</del></p>
+      </article>
+
+	  <article>
+		<p class="center">COMET + Web Sockets</p>
+	  </article>
+
+      <article>
+        <p class="center">Netty & Akka</p>
+      </article>
+
+      <article>
+        <h2>BlueEyes</h2>
+      </article>
+
+      <article>
+        <p class="center">Start with the <a href="https://github.com/jdegoes/blueeyes">README</a></p>
+      </article>
+
+      <article>
+        <p class="center">There's even <a href="http://noelwelsh.com/blueeyes/index.html">a book</a>!</p>
+      </article>
+
+      <article>
+        <p class="center">Documentati...</p>
+      </article>
+
+      <article>
+        <p class="center">Maybe there's an example</p>
+      </article>
+
+      <article>
+        <p class="center">Found <a href="http://www.jamesward.com/2012/02/06/next-gen-web-apps-with-scala-blueeyes-mongodb"><strong>one</strong></a></p>
+      </article>
+
+      <article>
+        <p class="center">Didn't work</p>
+      </article>
+
+      <article>
+        <p class="center">Is BlueEyes dead? Stagnant?</p>
+      </article>
+
+      <article>
+        <p class="center">What I got <small class="tiny">thanks to James Ward</small></p>
+      </article>
+
+	  <article>
+		<p class="center">Composition >> Inheritance</p>
+	  </article>
+
+	  <article>
+        <h3>                                                                                                                                                                    
+          Defining your paths is really simple
+        </h3>
+        <section>
+<pre>
+trait PostService extends BlueEyesServiceBuilder 
+      with MongoQueryBuilder 
+      with BijectionsChunkJson 
+      with BijectionsChunkString {
+  val postMongo = service("posts", "0.1") {
+    logging { log => context =>
+      ...
+    }
+  }
+}
+</pre>
+		</section>
+	  </article>
+ 
+      <article>
+        <h3>Startup</h3>
+        <section>
+<pre>
+startup {
+  log.debug("starting")
+  val mongoURI = new MongoURI("mongodb://127.0.0.1:27017/phase")
+  PostConfig(new EnvMongo(mongoURI, context.config.configMap("mongo"))).future
+} ->
+</pre>
+        </section>
+     
+     </article>
+
+      <article class="smaller">
+        <h3>Requests</h3>
+        <section>
+<pre>
+request { config: PostConfig =>
+  path("/posts") {
+    contentType(application/json) {
+      get { request: HttpRequest[JValue] =>
+        log.debug("getting posts")
+        config.database(selectAll.from("posts")) map { records =>
+          HttpResponse[JValue](content = Some(JArray(records.toList)))
+        }
+      }
+    } ~
+    contentType(application/json) {
+      post { request: HttpRequest[JValue] =>
+        request.content map { jv: JValue =>
+          config.database(insert(jv --> classOf[JObject]).into("posts"))
+          Future.sync(HttpResponse[JValue](content = request.content))
+        } getOrElse {
+          Future.sync(HttpResponse[JValue](status = HttpStatus(BadRequest)))
+        }
+      }
+    } ~
+    ...
+  }
+}
+</pre>
+        </section>
+
+     </article>
+
+      <article>
+        <h3>Shutdown</h3>
+        <section>
+<pre>
+shutdown { helloConfig: HelloConfig =>
+  Future.sync(())
+}
+</pre>
+        </section>
+
+     </article>
+
+      <article class="smaller">
+        <h3>Bring it together</h3>
+        <section>
+<pre>
+object AppServer extends HttpServer 
+       with HttpReflectiveServiceList[ByteChunk] 
+       with NettyEngine 
+       with PostService { self =>
+  override def main(args: Array[String]) {
+    Configgy.configureFromString("""
+      server.port = 8080
+      server.sslEnable = false
+    """)
+    start.deliverTo { _ =>
+      Runtime.getRuntime.addShutdownHook { new Thread {
+        override def start() {
+          val doneSignal = new CountDownLatch(1)
+
+          self.stop.deliverTo { _ =>
+            doneSignal.countDown()
+          }.ifCanceled { e =>
+            doneSignal.countDown()
+          }
+          doneSignal.await()
+        }
+      }}
+    }
+  }
+}
+</pre>
+        </section>
+
+     </article>
+
+	  <article>
+		<h2>Play! 2.0</h2>
+	  </article>
+
+      <article>
+        <p class="center">Powers <a href="http://gada.ms">http://gada.ms</a></p>
+		<div class="source"><a href="https://github.com/geowa4/web-aggregator">Source Code</a></div>
+      </article>
+
+	  <article>
+		<p class="center"><strong>Bigger</strong></p>
+	  </article>
+
+      <article>
+        <p class="center"><em>Active Development</em></p>
+      </article>
+
+      <article>
+        <p class="center">Documentation everywhere</p>
+      </article>
+
+      <article>
+        <p class="center">Examples galore</p>
+      </article>
+
+      <article>
+        <p class="center">Rails clone?</p>
+      </article>
+
+      <article>
+        <p class="center">Asset pipeline</p>
+      </article>
+
+      <article>
+        <h3>Routes</h3>
+<pre>
+# This file defines all application routes 
+# (Higher priority routes first)
+# ~~~~
+
+GET    /posts.xml        controllers.Application.atom()
+GET    /posts.json       controllers.Application.list(skip: Int ?= 0)
+GET    /posts/:id.json   controllers.Application.show(id: String)
+
+# Map static resources from the 
+# /public folder to the /assets URL path
+GET     /assets/*file    controllers.Assets.at(path="/public", file)
+
+# Content
+GET    /$path<.*>        controllers.Application.index(path)
+</pre>
+      </article>
+
+	  <article>
+		<p class="center">But wait, there's more!</p>
+	  </article>
+
+      <article>
+        <p class="center">Everything is compiled</p>
+      </article>
+
+      <article>
+        <p class="center">Even the <code>routes</code> conf</p>
+      </article>
+
+      <article>
+        <p class="center">Even the HTML files</p>
+      </article>
+	  
+	  <article>
+		<p class="">Even the JavaScript?</p>
+	  </article>
+
+	  <article>
+		<h3>index.scala.html</h3>
+<pre>
+@()
+&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+  &lt;head&gt;
+...
+</pre>
+	  </article>
+
+      <article>
+        <h3>main.scala.html</h3>
+<pre>
+@(content: Html)
+&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+  @content
+&lt;/html&gt;
+</pre>
+      </article>
+
+      <article>
+        <h3>other.scala.html</h3>
+<pre>
+@()
+@main {
+  &lt;h1&gt;Hello, PHASE!&lt;/h1&gt;
+}
+</pre>
+      </article>
+
+      <article>
+        <h3>Called from Scala</h3>
+<pre>
+object Application extends Controller {
+  def index(path: String) = Action {
+    Ok(views.html.index())
+  }
+
+  def atom = Action {
+    Ok(views.xml.posts(Post.list()))
+  }
+
+  def show(id: String) = Action {
+    Ok(toJson(Post.byId(id)))
+  }
+
+  def list(skip: Int) = Action {
+    Ok(toJson(Post.list(skip)))
+  }
+}
+</pre>
+      </article>
+
+	  <article>
+		<p class="center">Connecting to the database</p>
+	  </article>
+
+	  <article>
+		<p class="center">Evolutions</p>
+	  </article>
+
+	  <article>
+		<h3>Anorm</h3>
+<pre>
+case class User(email: String, name: String, password: String)
+object User {
+  val simple = {
+    get[String]("user.email") ~
+    get[String]("user.name") ~
+    get[String]("user.password") map {
+      case email~name~password => User(email, name, password)
+    }
+  }  
+
+  def findByEmail(email: String): Option[User] = {
+    DB.withConnection { implicit connection =>
+      SQL("select * from user where email = {email}").on(
+        'email -> email
+      ).as(User.simple.singleOpt)
+    }
+  }
+}
+</pre>
+	  </article>
+
+	  <article>
+		<h3>Foursquare's <a href="https://github.com/foursquare/rogue">Rogue</a></h3>
+<pre>
+object Post extends Post with MongoMetaRecord[Post] {
+  override def collectionName = "posts"
+
+  override def mongoIdentifier = PostMongo
+
+  val idIdx = Post.index(_.rid, Asc)
+  val publishedIdx = Post.index(_.published, Desc)
+  override val mongoIndexList = List(idIdx, publishedIdx)
+
+  def allQuery = Post where (_.rid exists true) 
+                      orderDesc (_.published)
+
+  def list(skip: Int = 0) = allQuery limit (20) skip (skip) fetch
+
+  def byId(id: String) = Post where (_.rid eqs id) fetch (1)
+}
+</pre>
+	  </article>
+
+	  <article>
+		<h3>Shut up, already</h3>
+		<ul class="build">
+		  <li>BlueEyes is young, but not maturing</li>
+		  <li>Play! is feature-rich and quickly expanding</li>
+		</ul>
+	  </article>
+
+	</section>
+
+  </body>
+</html>
